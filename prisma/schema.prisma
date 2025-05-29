@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Blockchain {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  ubid          String   @unique // Universal Blockchain Identifier
+  bnsName       String?  @unique // Blockchain Name System
+  apiKey        String   @unique
+  networkType   String   // mainnet, testnet
+  chainProtocol String   // eth, sol, dot, etc
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users         User[]
+  invoices      Invoice[]
+  identities    CrossChainIdentity[]
+  transactions  CrossChainTransaction[]
+}
+
+model User {
+  id            String   @id @default(uuid())
+  blockchainId  String
+  blockchain    Blockchain @relation(fields: [blockchainId], references: [id])
+  walletAddress String
+  creditScore   Int      @default(500)
+  identityHash  String?  @unique // ZK proof of identity
+  kycStatus     String?  // pending, verified, rejected
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transactions  Transaction[]
+  invoices      Invoice[]
+  crossChainIds CrossChainIdentity[]
+  crossChainTxs CrossChainTransaction[]
+  creditHistory CreditScoreHistory[]
+
+  @@unique([blockchainId, walletAddress])
+}
+
+model CrossChainIdentity {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  blockchainId  String
+  blockchain    Blockchain @relation(fields: [blockchainId], references: [id])
+  walletAddress String
+  proofHash     String   // ZK proof of wallet ownership
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([blockchainId, walletAddress])
+}
+
+model Transaction {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  amount        Float
+  type          String   // credit/debit
+  status        String   // success/failed/pending
+  hash          String
+  riskScore     Float?   // ML-based risk assessment
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CrossChainTransaction {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  sourceBlockchainId String
+  sourceBlockchain   Blockchain @relation(fields: [sourceBlockchainId], references: [id])
+  destinationAddress String
+  amount            Float
+  assetType         String   // ETH, BTC, USDC, etc
+  status            String   // pending, completed, failed
+  proofHash         String   // Cross-chain proof
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  blockchainId  String
+  blockchain    Blockchain @relation(fields: [blockchainId], references: [id])
+  amount        Float
+  currency      String   // ETH, BTC, USDC, etc
+  dueDate       DateTime
+  status        String   // paid/unpaid/overdue
+  ipfsHash      String?
+  tokenized     Boolean  @default(false)
+  tokenAddress  String?  // Address of tokenized invoice
+  escrowAddress String?  // Smart contract escrow address
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CreditScoreHistory {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  score         Int
+  factors       Json     // Scoring factors breakdown
+  createdAt     DateTime @default(now())
+}
